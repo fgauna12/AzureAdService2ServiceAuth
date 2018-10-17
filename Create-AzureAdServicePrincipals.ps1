@@ -14,11 +14,36 @@ function Create-AzureAdServicePrincipal {
         $ReplyUrls = @("https://localhost:44305/signin-oidc")
     )
     process {
-        New-AzureRmADApplication `
+        $application = New-AzureRmADApplication `
             -DisplayName $ServicePrincipalName `
-            -IdentifierUris @("https://equifax.com/") `
+            -IdentifierUris @($IdentifierUri) `
             -ReplyUrls $ReplyUrls `
-            -Verbose
+            -Verbose `
+            -ErrorAction 'Stop'
+
+        $servicePrincipal = New-AzureRmADServicePrincipal -ApplicationId $application.ApplicationId
+    }
+    end {
+        return $servicePrincipal;
     }
 }
 
+function Create-ClientSecret {
+    param(
+        # Object ID
+        [Parameter(Mandatory = $true)]
+        [string]
+        $ApplicationId
+    )
+    begin {
+        Add-Type -Assembly System.Web
+        $password = [System.Web.Security.Membership]::GeneratePassword(16,3)
+
+        Write-Host "Password will only be shown once: $password"
+    }
+    process {
+        $securePassword = ConvertTo-SecureString -Force -AsPlainText -String $password        
+        $endDate = (Get-Date).AddYears(1)
+        New-AzureRmADAppCredential -ApplicationId $ApplicationId -Password $securePassword -EndDate $endDate
+    }
+}
